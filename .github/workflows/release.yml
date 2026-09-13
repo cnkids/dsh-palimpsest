@@ -7,7 +7,9 @@ name: Release
 # 安全审计 F3 的硬化（本文件即修复结果）：
 #   - 构建与发布拆成两个 job，`id-token: write` 只给发布 job —— 否则连
 #     `npm install -g npm@latest` 这一步都能申请到可发布 npm 的 OIDC token。
-#   - 发布 job 走受保护环境（environment），可在仓库设置里要求人工审批。
+#   - 发布 job 不引用受保护环境：审批门在 GitHub 侧故障时会直接卡死发布
+#     （实测 required_reviewers 审批返回 500 且运行被取消）。与同类插件
+#     dsh-office-toolkit 的成功形态保持一致 —— 发布靠 OIDC 短时令牌 + provenance。
 #   - action 固定到 commit SHA（tag 是可变的）；checkout 不持久化凭据。
 #   - npm 版本固定，依赖走 package-lock.json（npm ci）；构建期做依赖漏洞扫描。
 on:
@@ -56,7 +58,6 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
-    environment: npm-publish
     permissions:
       contents: write   # 建 Release 与上传附件
       id-token: write   # npm Trusted Publishing(OIDC) 必需，只授予这个 job
