@@ -8,10 +8,22 @@
   "exports": {
     ".": "./lib/index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cnkids/dsh-palimpsest.git"
+  },
+  "homepage": "https://github.com/cnkids/dsh-palimpsest#readme",
+  "bugs": {
+    "url": "https://github.com/cnkids/dsh-palimpsest/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "files": [
     "lib",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "README.en.md"
   ],
   "dsh": {
     "bundle": {
