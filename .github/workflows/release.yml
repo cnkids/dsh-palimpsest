@@ -1,0 +1,70 @@
+name: Release
+
+# 推 v* tag 即自动：校验版本 → 跑测试 → 发布 npm（Trusted Publishing/OIDC，无需 token）
+# → 建 Release 并上传 .tgz。
+# 前置（只需做一次）：在 npmjs.com 上为本仓库配置 Trusted Publisher。
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # 建 Release 与上传附件
+  id-token: write   # npm Trusted Publishing(OIDC) 必需
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishing 要求 npm ≥ 11.5.1，runner 自带的偏旧
+      - name: 升级 npm
+        run: npm install -g npm@latest
+
+      - name: 校验 tag 与 package.json 版本一致
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          echo "tag=$TAG package=$PKG"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::tag v$TAG 与 package.json $PKG 不一致"
+            exit 1
+          fi
+
+      # 本插件零运行时依赖（只有 peer 依赖），测试走 node:test，故不装依赖、也无 lockfile
+      - name: 测试
+        run: npm test
+
+      # 幂等：首次上传若是本地手发的，这里跳过而不是把整个 Release 卡死
+      - name: 发布到 npm
+        run: |
+          V="$(node -p "require('./package.json').version")"
+          if npm view "dsh-palimpsest@$V" version >/dev/null 2>&1; then
+            echo "npm 上已存在 $V，跳过发布"
+          else
+            npm publish --provenance --access public
+          fi
+
+      - name: 打包 tgz
+        run: |
+          V="$(node -p "require('./package.json').version")"
+          npm pack
+          cp "dsh-palimpsest-$V.tgz" dsh-palimpsest.tgz
+          ls -la ./*.tgz
+
+      - name: 建 Release 并上传附件
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V="$(node -p "require('./package.json').version")"
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            "dsh-palimpsest-$V.tgz" dsh-palimpsest.tgz \
+            --clobber
