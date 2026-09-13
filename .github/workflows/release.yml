@@ -37,7 +37,11 @@ jobs:
             exit 1
           fi
 
-      # 本插件零运行时依赖（只有 peer 依赖），测试走 node:test，故不装依赖、也无 lockfile
+      # 本插件零运行时依赖，但 smoke.test.mjs 会 import 真实插件入口（lib/tools/* 需要
+      # peer 依赖 @deepseek-ai/dsh-tools），所以必须装一次，不能跳过。
+      - name: 安装依赖（peer）
+        run: npm install --no-audit --no-fund
+
       - name: 测试
         run: npm test
 
