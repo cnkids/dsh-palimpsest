@@ -244,7 +244,7 @@ do the data assembly, `lib/tools/` defines the three tools, and `lib/index.js` i
 | Version | Changes |
 | --- | --- |
 | **0.1.2** | Docs only: removes the duplicated whole-document copy from both READMEs and restores the truncated 0.1.1 changelog entry (the English table header had been displaced above the `## Changelog` heading); fixes stale numbers (147 → 162 test cases, coverage corrected to the measured 99.79% / 100% / 91.75%). No changes under `lib/` |
-| **0.1.1** | Security-audit fixes: private marker now fails closed when the title is unreadable; output redaction closes three gaps (prefixed+underscored key names / JSON-quoted forms / assignment forms containing `=` and `:`); release pipeline hardened (split jobs, pinned action SHAs and npm version, lockfile); cwd normalisation no longer collapses paths differing only by whitespace; scope is pre-checked before decoding a session log; retrieved data is wrapped in random-token boundaries; adds `audit/` (report + six PoCs) |
+| **0.1.1** | Security-audit fixes: private marker now fails closed when the title is unreadable; output redaction closes three gaps (prefixed+underscored key names / JSON-quoted forms / assignment forms containing `=` and `:`); release pipeline hardened (split jobs, pinned action SHAs and npm version, lockfile); cwd normalisation no longer collapses paths differing only by whitespace; scope is pre-checked before decoding a session log; retrieved data is wrapped in random-token boundaries |
 | **0.1.0** | First release: three read-only tools (list / search / read), hard working-directory scope, `fromSeq` paging, output redaction, whole-session private exclusion, untrusted-data notice |
 
 ## License
