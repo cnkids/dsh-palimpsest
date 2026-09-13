@@ -110,16 +110,47 @@ test('attachTitles 补上批量标题', async () => {
     readTitleSnapshots: async (ids) =>
       ids.map((sessionId) => ({ sessionId, status: 'fulfilled', value: { title: { title: `标题-${sessionId}` } } })),
   });
-  const entries = await attachTitles(query, [{ id: 'a' }, { id: 'b' }]);
+  const { entries, unreadable } = await attachTitles(query, [{ id: 'a' }, { id: 'b' }]);
   assert.deepEqual(entries.map((entry) => entry.title), ['标题-a', '标题-b']);
+  assert.equal(unreadable, 0);
 });
 
-test('attachTitles 对失败项保留原值', async () => {
-  const query = fakeSessionQuery({
-    readTitleSnapshots: async (ids) => ids.map((sessionId) => ({ sessionId, status: 'rejected' })),
+test('attachTitles 剔除标题读不出来的条目并回报数量（失败关闭，安全审计 F1）', async () => {
+  // 早期实现「保留原值」：原值可能是空串，而空标题会让 hidePrivate 把私密会话放行
+  const perItem = fakeSessionQuery({
+    readTitleSnapshots: async (ids) =>
+      ids.map((sessionId, index) =>
+        index === 0 ? { sessionId, status: 'rejected' } : { sessionId, status: 'fulfilled', value: {} },
+      ),
   });
-  const entries = await attachTitles(query, [{ id: 'a', title: '原值' }]);
-  assert.equal(entries[0].title, '原值');
+  const result = await attachTitles(perItem, [{ id: 'a', title: '原值' }, { id: 'b' }]);
+  assert.deepEqual(result.entries.map((entry) => entry.id), ['b']);
+  assert.equal(result.unreadable, 1);
+
+  // 整批抛错（宿主持久化列举失败时 projectMany 整批 rejected）→ 全部按不可读处理
+  const batch = fakeSessionQuery({
+    readTitleSnapshots: async () => {
+      throw Object.assign(new Error('列举失败'), { code: 'SESSION_QUERY_PERSISTENCE_FAILED' });
+    },
+  });
+  const failed = await attachTitles(batch, [{ id: 'a' }, { id: 'b' }]);
+  assert.deepEqual(failed.entries, []);
+  assert.equal(failed.unreadable, 2);
+});
+
+test('listSessionsForCwd 剔除标题读不出来的会话并回报数量（安全审计 F1）', async () => {
+  const query = fakeSessionQuery({
+    listSessions: async () => [record('ok', { createdAt: 2 }), record('unknown', { createdAt: 1 })],
+    readTitleSnapshots: async (ids) =>
+      ids.map((sessionId) =>
+        sessionId === 'ok'
+          ? { sessionId, status: 'fulfilled', value: { title: { title: '正常' } } }
+          : { sessionId, status: 'rejected' },
+      ),
+  });
+  const { entries, unreadable } = await listSessionsForCwd(query, { cwd: '/work', limit: 10 });
+  assert.deepEqual(entries.map((entry) => entry.id), ['ok']);
+  assert.equal(unreadable, 1);
 });
 
 test('transcriptOf 把 surface 事件折成对话条目', async () => {

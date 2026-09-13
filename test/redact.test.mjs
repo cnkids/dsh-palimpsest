@@ -78,3 +78,36 @@ test('长文本上不出现灾难性回溯', () => {
   redact('a'.repeat(200_000));
   assert.ok(Date.now() - started < 1000, '脱敏在长文本上耗时异常');
 });
+
+// 以下三组是安全审计 F2 的回归：早期实现把这三类常见形态整类放过。
+test('识别「前缀+下划线」的常见键名（安全审计 F2-A）', () => {
+  for (const line of [
+    `secret_key=${BODY}`,
+    `client_secret=${BODY}`,
+    `access_token=${BODY}`,
+    `refresh_token=${BODY}`,
+    `private_key=${BODY}`,
+    `DB_PASSWORD=${BODY}`,
+    `AWS_SECRET_ACCESS_KEY=${BODY}`,
+  ]) {
+    const { text, count } = redact(line);
+    assert.equal(count, 1, `未打码：${line}`);
+    assert.ok(!text.includes(BODY), `残留：${line}`);
+  }
+});
+
+test('JSON 写法（键名与值都带引号）同样打码（安全审计 F2-B）', () => {
+  for (const line of [`"apiKey": "${BODY}"`, `{"password": "${BODY}"}`, `password="${BODY}"`]) {
+    const { text, count } = redact(line);
+    assert.equal(count, 1, `未打码：${line}`);
+    assert.ok(!text.includes(BODY), `残留：${line}`);
+  }
+});
+
+test('值里含 $ 不代表就是占位符（安全审计 F2-C）', () => {
+  const { text, count } = redact('password=hunter$hunter2');
+  assert.equal(count, 1);
+  assert.ok(!text.includes('hunter$hunter2'));
+  // 而真正的变量引用仍要放过（真机误报回归）
+  assert.equal(redact('password=$hunter2hunter2').count, 0);
+});

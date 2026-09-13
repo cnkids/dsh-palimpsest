@@ -54,3 +54,10 @@ test('没有命中时不写多余的话', () => {
   assert.ok(!text.includes('打码'));
   assert.ok(!text.includes('私密标记'));
 });
+
+test('标题读不出来的会话数如实写进前言（安全审计 F1）', () => {
+  const text = preface(0, 0, 2);
+  assert.match(text, /2 个会话的标题读不出来/u);
+  assert.match(text, /已按私密处理跳过/u);
+  assert.ok(!preface(0, 0, 0).includes('读不出来'), '计数为 0 时不该写这句话');
+});

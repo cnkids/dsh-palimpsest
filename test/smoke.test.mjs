@@ -347,3 +347,64 @@ test('palimpsest_read 未指定 fromSeq 时仍旧保留最近的尾部', async (
   assert.match(out.content, /第4条/u, '应当保留最近的内容');
   assert.ok(!out.content.includes('下一段'));
 });
+
+test('palimpsest_read 在标题读不出来时失败关闭（安全审计 F1）', async () => {
+  const sessionQuery = fakeSessionQuery({
+    readTitle: async () => {
+      const error = new Error('持久化列举失败');
+      error.code = 'SESSION_QUERY_PERSISTENCE_FAILED';
+      throw error;
+    },
+    readSurface: async () => ({ session: { id: 'secret', cwd: '/work' }, events: [userEvent(1, HOUR, '机密正文')] }),
+  });
+  const out = await loadPlugin(sessionQuery).get('palimpsest_read').execute({ sessionId: 'secret' }, callContext());
+  assert.ok(!out.content.includes('机密正文'), '标题读不出来时不该交出正文');
+  assert.match(out.content, /拒绝读取/u);
+  assert.match(out.content, /SESSION_QUERY_PERSISTENCE_FAILED/u);
+});
+
+test('标题批量读失败时 list/search 按私密跳过并如实说明（安全审计 F1）', async () => {
+  const sessionQuery = fakeSessionQuery({
+    listSessions: async () => [record('s-private')],
+    listEvents: async () => [userEvent(1, HOUR, '机密正文')],
+    readTitleSnapshots: async () => {
+      throw Object.assign(new Error('列举失败'), { code: 'SESSION_QUERY_PERSISTENCE_FAILED' });
+    },
+    filterEvents: async () => [
+      { sessionId: 's-private', seq: 1, time: HOUR, type: 'user/message', surface: 'active', text: '机密正文' },
+    ],
+  });
+  const tools = loadPlugin(sessionQuery);
+  const listOut = await tools.get('palimpsest_list').execute({}, callContext());
+  assert.ok(!listOut.content.includes('s-private'), '标题不可读的会话不该出现在列表里');
+  assert.match(listOut.content, /1 个会话的标题读不出来/u);
+  const searchOut = await tools.get('palimpsest_search').execute({ query: '机密' }, callContext());
+  assert.ok(!searchOut.content.includes('机密正文'), '标题不可读的命中不该带出正文片段');
+  assert.match(searchOut.content, /1 个会话的标题读不出来/u);
+});
+
+test('跨目录会话在解压正文之前就被预检拒绝（安全审计 F5）', async () => {
+  let surfaceReads = 0;
+  const sessionQuery = fakeSessionQuery({
+    listSessions: async () => [record('foreign', { cwd: '/elsewhere' })],
+    readTitle: async () => ({ title: '标题' }),
+    readSurface: async () => {
+      surfaceReads += 1;
+      return { session: { id: 'foreign', cwd: '/elsewhere' }, events: [userEvent(1, HOUR, '别的项目')] };
+    },
+  });
+  const out = await loadPlugin(sessionQuery).get('palimpsest_read').execute({ sessionId: 'foreign' }, callContext('/work'));
+  assert.match(out.content, /不在当前工作目录下，已拒绝读取/u);
+  assert.equal(surfaceReads, 0, '预检应当在解压正文之前就否掉跨目录 id');
+});
+
+test('取回内容被带随机 token 的边界包住（安全审计 F6）', async () => {
+  const sessionQuery = fakeSessionQuery({
+    readTitle: async () => ({ title: '标题' }),
+    readSurface: async () => ({ session: { id: 'session-a', cwd: '/work' }, events: [userEvent(1, HOUR, '正文')] }),
+  });
+  const out = await loadPlugin(sessionQuery).get('palimpsest_read').execute({ sessionId: 'session-a' }, callContext());
+  const token = out.content.match(/<<<PALIMPSEST-DATA ([0-9a-f]{12})>>>/u)?.[1];
+  assert.ok(token, '缺少起始边界');
+  assert.ok(out.content.includes(`<<<END-PALIMPSEST-DATA ${token}>>>`), '缺少配对的结束边界');
+});

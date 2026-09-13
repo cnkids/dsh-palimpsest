@@ -32,6 +32,17 @@ test('会话缺少 cwd 时不匹配任何目录', () => {
   assert.equal(matchesCwd(undefined, '/a/b'), false);
 });
 
+test('路径里的空白字符属于路径本身，不得被折叠（安全审计 F4）', () => {
+  // `/a/b ` 与 `/a/b` 在 Unix/macOS 上是两个不同目录，范围判定必须区分
+  assert.equal(normalizeCwd('/a/b '), '/a/b ');
+  assert.equal(normalizeCwd('/a/b\t'), '/a/b\t');
+  assert.equal(matchesCwd({ cwd: '/a/b ' }, '/a/b'), false);
+  assert.equal(matchesCwd({ cwd: '/a/b\t' }, '/a/b'), false);
+  assert.equal(matchesCwd({ cwd: '/a/b ' }, '/a/b '), true);
+  // 尾部斜杠差异仍然忽略（这条是设计如此）
+  assert.equal(matchesCwd({ cwd: '/a/b//' }, '/a/b'), true);
+});
+
 test('clampCount 使用缺省值与上限', () => {
   assert.equal(clampCount(undefined, 20, 100), 20);
   assert.equal(clampCount(0, 20, 100), 20);
