@@ -1,0 +1,12 @@
+# 免安装的端到端验证补丁：把插件按**绝对路径**插入插件树，
+# 不改动任何 profile 的 package.json，因此适合回归验证。
+#
+# `__PLUGIN_DIR__` 是占位符，用前先替换成插件所在目录，例如：
+#   sed "s#__PLUGIN_DIR__#$PWD#" test/e2e.patch.yml > /tmp/dsh-palimpsest.patch.yml
+#   cd <一个有多个历史会话的工作目录>
+#   dsh --profile headless --patch /tmp/dsh-palimpsest.patch.yml "调用 palimpsest_list 看看有哪些历史会话"
+#
+# 加载器按原生 ESM 解析这个 name，所以绝对路径（含 .js）是必需的。
+- insert:
+    - id: dsh-palimpsest-e2e
+      name: '__PLUGIN_DIR__/lib/index.js'

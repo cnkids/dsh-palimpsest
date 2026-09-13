@@ -1,0 +1,9 @@
+# dsh-palimpsest bundle patch：把记忆检索插件插入 profile 名单。
+# 插件只跑在宿主侧（没有 dsh.client 半边），不向前端投递任何代码。
+#
+# 安装：
+#   dsh plugin --profile web add dsh-palimpsest
+# 装完重启 dsh web 生效。
+- insert:
+    - id: dsh-palimpsest
+      name: 'dsh-palimpsest'
