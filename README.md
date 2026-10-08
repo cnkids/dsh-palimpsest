@@ -82,6 +82,8 @@ dsh plugin --profile web add "$(pwd)"
 
 两种方式装完都必须**重启 `dsh web` 并新建会话**才会加载 —— profile 的插件树在启动时装配。
 
+> **版本匹配（无需随 DSH 发版再改）**：DSH 0.2.0 起，宿主会对 `@deepseek-ai/dsh-*` peer 不兼容的插件**直接禁用**（启动日志会提示 `incompatible with dsh … may cause crashes or data loss`）。本插件的 peer 声明是**无上界**的 `@deepseek-ai/dsh-tools: >=0.1.5-rc.1 || >=0.2.0-rc.2`，覆盖 DSH 0.1.x、0.2.x 以及未来版本 —— 它只使用 `defineTool` 与 `ctx.sessionQuery` 这组跨版本稳定的接口，所以一次声明即可长期生效。并集写法是为了让 npm 在「全是预发布版本」的 dsh-tools 上也能解析到 0.2.x（单写 `>=0.1.5-rc.1` 时 semver 默认不把 0.2.0-rc 视为可选）。
+
 ## 快速上手
 
 装好重启后，**不需要点名工具**，直接说人话即可：
@@ -192,11 +194,11 @@ DSH 自带 `dsh-session-query-sqlite`（SQLite FTS5），但 base bundle 默认�
 ## 开发
 
 ```sh
-npm test           # 162 个用例：纯逻辑单测 + 插件入口冒烟 + 三工具端到端（替身 sessionQuery）
+npm test           # 163 个用例：纯逻辑单测 + 插件入口冒烟 + 三工具端到端（替身 sessionQuery）
 npm run coverage   # 同上，并生成 coverage/lcov.info
 ```
 
-覆盖率（Node 内置统计）：行 99.79%、函数 100%、分支 91.75%。
+覆盖率（Node 内置统计）：行 99.80%、函数 100%、分支 91.89%。
 
 **真机验证**：`test/e2e.patch.yml` 按绝对路径把插件插入插件树，不改动任何 profile：
 
@@ -232,6 +234,7 @@ export SONAR_TOKEN_DSH_PALIMPSEST=sqp_xxxxxxxx
 
 | 版本 | 变更 |
 | --- | --- |
+| **0.2.0** | 适配 DeepSeek Harness 0.2.0：0.2.0 起宿主会对 peer 不兼容的插件在启动时禁用（日志提示 `incompatible with dsh`），旧的 `^0.1.5-rc.1` 上界为 `<0.2.0`，使插件在 0.2.0 上被跳过。peer 改为**无上界**的 `>=0.1.5-rc.1 \|\| >=0.2.0-rc.2`：从此覆盖 0.1.x / 0.2.x 及未来版本，不需要再随 DSH 发版改动。同时为过 SonarQube 门禁做了**行为等价**的整理：赋值型密钥的键名判定从超长正则移入代码（S5843/S5852/S5869）、`titleMap` 拆出批量结果归并函数（S3776）、错误码显式转字符串（S6551）。163 个用例在 dsh-tools 0.2.0-rc.2 下全绿，并在真实 0.2.0 运行时上端到端验证三个工具可用 |
 | **0.1.2** | 只改文档：删除两份 README 中重复的整篇副本，复原被截断的 0.1.1 版本记录（英文版表头曾错位到 Changelog 标题上方）；修正已失效的数字（用例数 147→162、覆盖率改为实测 99.79% / 100% / 91.75%）。`lib/` 无改动 |
 | **0.1.1** | 安全审计修复：私密标记在标题读不出来时失败关闭；出口脱敏补三类缺口（前缀+下划线键名 / JSON 引号写法 / 含 `=` 与 `:` 的赋值式）；发布链硬化（拆 job、固定 action SHA 与 npm 版本、上 lockfile）；工作目录归一化不再折叠含空白的路径；读取先做范围预检；取回内容加随机 token 边界 |
 | **0.1.0** | 首个版本：三个只读工具（列出 / 检索 / 读取）、工作目录硬范围、`fromSeq` 分段翻页、出口脱敏、私密会话整段排除、不可信数据声明 |

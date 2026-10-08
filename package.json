@@ -1,6 +1,6 @@
 {
   "name": "dsh-palimpsest",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "让 DSH 智能体在新会话里按需检索同一工作目录下历史会话的记忆",
   "license": "MIT",
   "type": "module",
@@ -31,7 +31,7 @@
     }
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-tools": "^0.1.5-rc.1"
+    "@deepseek-ai/dsh-tools": ">=0.1.5-rc.1 || >=0.2.0-rc.2"
   },
   "engines": {
     "node": ">=20"

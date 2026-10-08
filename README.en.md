@@ -83,6 +83,8 @@ dsh plugin --profile web add "$(pwd)"
 
 Either way you must **restart `dsh web` and start a new session** — a profile's plugin tree is assembled at startup.
 
+> **Version matching (no per-release edits needed)**: as of DSH 0.2.0 the host *disables* plugins whose `@deepseek-ai/dsh-*` peer ranges don't match the runtime (the boot log warns `incompatible with dsh … may cause crashes or data loss`). This plugin declares an **open-ended** peer, `@deepseek-ai/dsh-tools: >=0.1.5-rc.1 || >=0.2.0-rc.2`, covering DSH 0.1.x, 0.2.x and every future release — it only uses the cross-version-stable `defineTool` and `ctx.sessionQuery` surface, so one declaration can stand. The union form exists so npm can still select 0.2.x prereleases (a single `>=0.1.5-rc.1` makes semver skip `0.2.0-rc*` by default).
+
 ## Quick start
 
 After restarting, you do **not** need to name any tool. Just talk normally:
@@ -200,11 +202,11 @@ To enable it, edit `~/.dsh/profiles/web/cordis.patch.yml`:
 ## Development
 
 ```sh
-npm test           # 162 cases: pure unit tests + plugin-entry smoke + three-tool end-to-end (fake sessionQuery)
+npm test           # 163 cases: pure unit tests + plugin-entry smoke + three-tool end-to-end (fake sessionQuery)
 npm run coverage   # same, plus coverage/lcov.info
 ```
 
-Coverage (Node's built-in stats): 99.79% lines, 100% functions, 91.75% branches.
+Coverage (Node's built-in stats): 99.80% lines, 100% functions, 91.89% branches.
 
 **Real-machine verification**: `test/e2e.patch.yml` inserts the plugin into the plugin tree by
 absolute path without touching any profile:
@@ -243,6 +245,7 @@ do the data assembly, `lib/tools/` defines the three tools, and `lib/index.js` i
 
 | Version | Changes |
 | --- | --- |
+| **0.2.0** | Adapts to DeepSeek Harness 0.2.0: as of 0.2.0 the host disables plugins with incompatible peers at boot (log warns `incompatible with dsh`), and the old `^0.1.5-rc.1` range (upper bound `<0.2.0`) made the plugin get skipped on 0.2.0. The peer is now **open-ended**, `>=0.1.5-rc.1 \|\| >=0.2.0-rc.2`, covering 0.1.x / 0.2.x and all future releases, so it no longer needs editing per DSH release. Behaviour-preserving cleanups were also made to satisfy the SonarQube gate: assignment key-name detection moved from an over-long regex into code (S5843/S5852/S5869), the batch-title merge extracted out of `titleMap` (S3776), and error codes coerced to strings explicitly (S6551). All 163 test cases pass against dsh-tools 0.2.0-rc.2, and the three tools were verified end-to-end on a real 0.2.0 runtime |
 | **0.1.2** | Docs only: removes the duplicated whole-document copy from both READMEs and restores the truncated 0.1.1 changelog entry (the English table header had been displaced above the `## Changelog` heading); fixes stale numbers (147 → 162 test cases, coverage corrected to the measured 99.79% / 100% / 91.75%). No changes under `lib/` |
 | **0.1.1** | Security-audit fixes: private marker now fails closed when the title is unreadable; output redaction closes three gaps (prefixed+underscored key names / JSON-quoted forms / assignment forms containing `=` and `:`); release pipeline hardened (split jobs, pinned action SHAs and npm version, lockfile); cwd normalisation no longer collapses paths differing only by whitespace; scope is pre-checked before decoding a session log; retrieved data is wrapped in random-token boundaries |
 | **0.1.0** | First release: three read-only tools (list / search / read), hard working-directory scope, `fromSeq` paging, output redaction, whole-session private exclusion, untrusted-data notice |

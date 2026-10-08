@@ -62,6 +62,20 @@ test('普通文本原样返回', () => {
   assert.equal(text, original);
 });
 
+test('键名按完整片段判定，普通标识不被误伤', () => {
+  // 关键词必须独占一个片段：`tokenizer` / `passwordreset` / `secretary` 里的
+  // token / password / secret 都嵌在更长标识里，不是密钥键名。
+  for (const line of [`tokenizer=${BODY}`, `passwordreset=${BODY}`, `secretary=${BODY}`]) {
+    const { text, count } = redact(line);
+    assert.equal(count, 0, `误伤：${line}`);
+    assert.equal(text, line, `被改动：${line}`);
+  }
+  // 分隔符拆开的 api_key / private_key 仍要认得（由相邻片段拼接判定）
+  for (const line of [`api_key=${BODY}`, `private_key=${BODY}`]) {
+    assert.equal(redact(line).count, 1, `漏报：${line}`);
+  }
+});
+
 test('多处命中累计计数', () => {
   const { count } = redact(`${shaped('sk')} 和 ${shaped('ghp', '_')}`);
   assert.equal(count, 2);
