@@ -79,6 +79,11 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       # 幂等：首次上传若是本地手发的，这里跳过而不是把整个 Release 卡死
+      #
+      # 注意：npm 已启用 Staged Publishing（暂存发布）。CI 的 npm publish 会把版本送进
+      # 暂存区并返回成功（`+ pkg@x.y.z`），但**必须由维护者用 2FA 人工批准**才会上线
+      # （`npm stage list` → `npm stage approve <stage-id>`，或在 npmjs.com 上批准）。
+      # 这一步 CI 无法代替，看到 "being processed" 不等于已可用。
       - name: 发布到 npm
         run: |
           V="$(node -p "require('./package.json').version")"
@@ -95,13 +100,23 @@ jobs:
           cp "dsh-palimpsest-$V.tgz" dsh-palimpsest.tgz
           ls -la ./*.tgz
 
+      # 仓库启用了 immutable releases：release 一旦正式发布就不能再补附件，
+      # 原先「先 create 再 upload」会被拒：HTTP 422 Cannot upload assets to an immutable release。
+      # 正确顺序：建 draft → 传附件 → 最后才 --draft=false 发布。
+      #
+      # 警告：**绝不要**为了补附件而删掉已发布的 release。immutable releases 会永久占用
+      # 那个 tag 名，删除后再建只会得到 `tag_name was used by an immutable release`
+      # （v0.2.0 就是这么丢掉公开 release 的）。所以这里已存在就原样跳过。
       - name: 建 Release 并上传附件
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           V="$(node -p "require('./package.json').version")"
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME 已存在，跳过（不删除：immutable tag 删了会永久锁死）"
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" --draft --title "$GITHUB_REF_NAME" --generate-notes
           gh release upload "$GITHUB_REF_NAME" \
-            "dsh-palimpsest-$V.tgz" dsh-palimpsest.tgz \
-            --clobber
+            "dsh-palimpsest-$V.tgz" dsh-palimpsest.tgz
+          gh release edit "$GITHUB_REF_NAME" --draft=false
